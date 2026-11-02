@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendario Impegni</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{--bg:#f5f6f8;--card:#fff;--ink:#1f2430;--muted:#6b7280;--line:#e3e6eb;--accent:#2f5bea}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  header{padding:18px 16px 6px;max-width:1100px;margin:0 auto}
+  h1{margin:0;font-size:22px}
+  header p{margin:4px 0 0;color:var(--muted);font-size:14px}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  .bar button{padding:6px 11px;font-size:13px}
+  #sync{font-size:13px;color:var(--muted)}
+  main{max-width:1100px;margin:0 auto;padding:12px 16px 40px;display:grid;gap:16px}
+  #app{display:grid;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card h2{margin:0 0 12px;font-size:16px}
+  form{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end}
+  label{font-size:12px;color:var(--muted);display:grid;gap:4px}
+  input,select{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%}
+  input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .wide{grid-column:1/-1}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);padding:9px 14px;border-radius:8px}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button:disabled{opacity:.6;cursor:default}
+  button:hover{filter:brightness(.97)}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .spacer{flex:1}
+  .nav{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .nav h2{margin:0 8px;min-width:150px;text-align:center;text-transform:capitalize}
+  .scroll{overflow-x:auto;border-radius:8px}
+  #exportArea{background:#fff;padding:16px;width:980px}
+  #exportArea .title{font-size:22px;font-weight:700;text-transform:capitalize;margin-bottom:10px}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  .legend span{font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--line);border-left:1px solid var(--line)}
+  .dow{background:#f0f2f6;font-size:12px;font-weight:600;text-align:center;padding:6px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .day{min-height:96px;padding:4px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:3px}
+  .day.out{background:#fafbfc}
+  .day.out .num{opacity:.35}
+  .day.we{background:#fbfbfd}
+  .day.today .num{background:var(--accent);color:#fff;border-radius:99px}
+  .num{font-size:12px;font-weight:600;width:22px;height:22px;display:grid;place-items:center}
+  .chip{font-size:11px;line-height:1.25;padding:2px 5px;border-radius:4px;border-left:3px solid;word-break:break-word}
+  .chip b{font-weight:700}
+  .empty{color:var(--muted);font-size:14px;padding:8px 0}
+  .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
+  #msg,#lmsg{font-size:13px;color:var(--muted)}
+  #lmsg.err,#msg.err{color:#b42318}
+  #mobileView{display:none}
+  .mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+  .mdow{font-size:11px;color:var(--muted);text-align:center;padding:4px 0}
+  .mcell{aspect-ratio:1/1.05;border:1px solid var(--line);border-radius:8px;background:#fff;padding:4px 2px;display:flex;flex-direction:column;align-items:center;gap:4px;font:inherit;font-size:13px;color:var(--ink);cursor:pointer;min-width:0}
+  .mcell.out{opacity:.35}
+  .mcell.sel{outline:2px solid var(--accent);outline-offset:-1px;background:#f3f6ff}
+  .mcell.today .n{background:var(--accent);color:#fff;border-radius:99px;padding:0 6px}
+  .dots{display:flex;flex-wrap:wrap;gap:2px;justify-content:center}
+  .dot{display:block;width:7px;height:7px;border-radius:50%}
+  #mday h3{font-size:15px;margin:16px 0 8px;text-transform:capitalize}
+  .mev{padding:10px 12px;border-radius:8px;border-left:4px solid;margin-bottom:8px;font-size:14px;line-height:1.4}
+  .item{border:1px solid var(--line);border-left:4px solid;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:grid;gap:6px}
+  .itop{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+  .per{font-size:13px;color:var(--muted)}
+  .item .row button{padding:6px 12px;font-size:13px}
+  .grp{border:1px solid var(--line);border-left:4px solid;border-radius:8px;margin-bottom:8px;background:#fff}
+  .grp summary{cursor:pointer;padding:11px 12px;display:flex;align-items:center;gap:10px;list-style:none}
+  .grp summary::-webkit-details-marker{display:none}
+  .grp summary::after{content:'▾';margin-left:auto;color:var(--muted);transition:transform .15s}
+  .grp[open] summary::after{transform:rotate(180deg)}
+  .cnt{font-size:13px;color:var(--muted)}
+  .gbody{padding:0 12px 10px;display:grid;gap:8px}
+  .sub{border-top:1px solid var(--line);padding-top:8px;display:grid;gap:6px}
+  .sub .row button{padding:6px 12px;font-size:13px}
+  .ro #formCard,.ro [data-edit],.ro [data-del],.ro #bkImp{display:none!important}
+  .login{max-width:460px;margin:0 auto;width:100%}
+  .login p{font-size:14px;color:var(--muted);margin:0 0 12px;line-height:1.45}
+  @media (max-width:700px){
+    #mobileView{display:block}
+    #exportWrap{position:absolute;left:-10000px;top:0;overflow:visible}
+    header{padding:14px 12px 2px}
+    header h1{font-size:20px}
+    main{padding:8px 10px 32px;gap:12px}
+    .card{padding:12px}
+    input,select{font-size:16px;padding:11px 10px}
+    button{padding:11px 14px}
+    .bar button{padding:8px 12px}
+    form{grid-template-columns:1fr 1fr}
+    form label:first-child,form .wide{grid-column:1/-1}
+    #loginForm{grid-template-columns:1fr}
+    .nav{gap:6px}
+    .nav h2{flex:1;min-width:0;font-size:16px;margin:0}
+    .nav .spacer{display:none}
+    .nav label{min-width:100%!important;order:5}
+    .exp button{flex:1}
+    .legend{margin-bottom:10px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>📅 Calendario Impegni</h1>
+  <p>Impegni dei dipendenti, sempre aggiornati per tutti.</p>
+  <div class="bar" id="bar" hidden>
+    <span id="sync"></span>
+    <button id="refreshBtn">↻ Aggiorna</button>
+    <button id="shareBtn">🔗 Copia link</button>
+    <button id="logoutBtn">Esci</button>
+  </div>
+</header>
+<main>
+  <section class="card login" id="login" hidden>
+    <h2>Accedi al calendario</h2>
+    <p>Inserisci il repository dei dati e la chiave di accesso che ti ha dato chi gestisce il calendario. Li inserisci una volta sola su questo dispositivo.</p>
+    <form id="loginForm">
+      <label>Repository dei dati
+        <input id="lrepo" required placeholder="es. tuonome/calendario-dati" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </label>
+      <label>Chiave di accesso
+        <input id="ltoken" type="password" required placeholder="github_pat_..." autocomplete="off" autocapitalize="off" spellcheck="false">
+      </label>
+      <div class="row">
+        <button class="primary" type="submit" id="loginBtn">Entra</button>
+        <span id="lmsg"></span>
+      </div>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+    <section class="card" id="formCard">
+      <h2 id="formTitle">Nuovo impegno</h2>
+      <form id="f">
+        <label>Nome
+          <input id="nome" list="nomi" required placeholder="es. Gerardo" autocomplete="off">
+          <datalist id="nomi"></datalist>
+        </label>
+        <label>Dal
+          <input id="dal" type="date" required>
+        </label>
+        <label>Al
+          <input id="al" type="date" required>
+        </label>
+        <label class="wide">Impegno
+          <input id="impegno" required placeholder="es. Occupato per evento X" autocomplete="off">
+        </label>
+        <div class="row wide">
+          <button class="primary" type="submit" id="saveBtn">Aggiungi</button>
+          <button type="button" id="cancelBtn" hidden>Annulla modifica</button>
+          <span id="msg"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="nav">
+        <button id="prev">◀</button>
+        <h2 id="monthLabel"></h2>
+        <button id="next">▶</button>
+        <button id="todayBtn">Oggi</button>
+        <span class="spacer"></span>
+        <label style="min-width:150px">Filtra per nome
+          <select id="filtro"><option value="">Tutti</option></select>
+        </label>
+      </div>
+      <div class="row exp" style="margin-bottom:12px">
+        <button class="primary" id="expPdf">⬇ Esporta PDF</button>
+        <button class="primary" id="expImg">⬇ Esporta immagine</button>
+      </div>
+      <div id="mobileView">
+        <div class="legend" id="mlegend"></div>
+        <div class="mgrid" id="mgrid"></div>
+        <div id="mday"></div>
+      </div>
+      <div class="scroll" id="exportWrap">
+        <div id="exportArea">
+          <div class="title" id="expTitle"></div>
+          <div class="legend" id="legend"></div>
+          <div class="grid" id="grid"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Elenco impegni</h2>
+      <div id="list"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="bkExp">Salva backup (.json)</button>
+        <button id="bkImp">Carica backup</button>
+        <input type="file" id="bkFile" accept="application/json" hidden>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+/* ---------- Config & stato ---------- */
+const API = 'https://api.github.com';
+const FILE = 'impegni.json';
+const CFG_KEY = 'calendario-cfg-v2';
+const CACHE_KEY = 'calendario-cache-v2';
+const MESI = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+const DOW = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+const PALETTE = [220,0,140,30,280,170,320,50,200,100,10,260];
+const $ = id => document.getElementById(id);
+
+let cfg = loadJSON(CFG_KEY, null);          // {repo, token, ro}
+let items = [];
+let colori = {};
+let canWrite = !(cfg && cfg.ro);
+let cur = new Date(); cur.setDate(1);
+let editId = null;
+let selDay = null;
+let busy = false;
+
+function loadJSON(k, def){ try{ const v = JSON.parse(localStorage.getItem(k)); return v ?? def; }catch(e){ return def; } }
+function saveJSON(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+
+/* ---------- Utilità ---------- */
+const pad = n => String(n).padStart(2,'0');
+const iso = (y,m,d) => `${y}-${pad(m+1)}-${pad(d)}`;
+const fmt = s => { const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; };
+const esc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hhmm = () => new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+const newId = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const nk = s => s.trim().toLowerCase().replace(/\s+/g,' ');
+const setSync = t => { $('sync').textContent = t; };
+
+/* ---------- Colori: assegnati la prima volta e poi fissi ---------- */
+function hueFor(map, name, create){
+  const k = nk(name);
+  if(map[k] !== undefined) return map[k];
+  const n = Object.keys(map).length;
+  const h = n < PALETTE.length ? PALETTE[n] : Math.round((n*137.508)%360);
+  if(create) map[k] = h;
+  return h;
+}
+function col(name){
+  const h = hueFor(colori, name, true);
+  return {bg:`hsl(${h},75%,91%)`, bd:`hsl(${h},60%,42%)`, tx:`hsl(${h},55%,20%)`};
+}
+
+/* ---------- GitHub API ---------- */
+const hdr = () => ({'Authorization':'Bearer '+cfg.token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'});
+const b64enc = s => { let bin=''; new TextEncoder().encode(s).forEach(x=>bin+=String.fromCharCode(x)); return btoa(bin); };
+const b64dec = s => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g,'')), c=>c.charCodeAt(0)));
+function errText(status){
+  if(status===401) return 'Chiave non valida o scaduta.';
+  if(status===403) return 'Accesso negato (permessi insufficienti o troppe richieste).';
+  if(status===404) return 'Repository non trovato: controlla il nome e i permessi della chiave.';
+  return 'Errore GitHub ('+status+').';
+}
+function normalize(d){
+  d = d && typeof d==='object' ? d : {};
+  return {
+    versione: 2,
+    impegni: Array.isArray(d.impegni) ? d.impegni.filter(x=>x&&x.nome&&x.dal&&x.al&&x.impegno) : [],
+    colori: d.colori && typeof d.colori==='object' ? d.colori : {}
+  };
+}
+async function ghGet(){
+  const r = await fetch(`${API}/repos/${cfg.repo}/contents/${FILE}`, {headers:hdr(), cache:'no-store'});
+  if(r.status===404) return {data:null, sha:null};
+  if(!r.ok) throw new Error(errText(r.status));
+  const j = await r.json();
+  return {data: JSON.parse(b64dec(j.content)), sha: j.sha};
+}
+function ghPut(data, sha){
+  const body = {message:'Aggiornamento calendario', content:b64enc(JSON.stringify(data,null,1))};
+  if(sha) body.sha = sha;
+  return fetch(`${API}/repos/${cfg.repo}/contents/${FILE}`, {method:'PUT', headers:{...hdr(),'Content-Type':'application/json'}, body:JSON.stringify(body)});
+}
+
+// Legge sempre la versione più recente, applica la modifica e salva: così più persone possono lavorare insieme senza sovrascriversi.
+async function mutate(fn){
+  setSync('Salvataggio…');
+  for(let i=0;i<3;i++){
+    const remote = await ghGet();
+    const data = normalize(remote.data);
+    fn(data);
+    data.impegni.forEach(x=>hueFor(data.colori, x.nome, true));
+    const r = await ghPut(data, remote.sha);
+    if(r.ok){
+      applyData(data);
+      setSync('Sincronizzato alle '+hhmm());
+      return;
+    }
+    if(r.status===409 || r.status===422) continue;
+    if(r.status===403 || r.status===404){
+      canWrite = false; cfg.ro = true; saveJSON(CFG_KEY, cfg); updateWriteUI();
+      throw new Error('Questa chiave non permette di modificare (solo lettura).');
+    }
+    throw new Error(errText(r.status));
+  }
+  throw new Error('Qualcun altro sta salvando in questo momento: riprova.');
+}
+
+function legacyData(){
+  return normalize({
+    impegni: loadJSON('calendario-impegni-v1', []),
+    colori: loadJSON('calendario-impegni-colori-v1', {})
+  });
+}
+
+async function refresh(){
+  if(!cfg || busy) return;
+  try{
+    setSync('Aggiornamento…');
+    const remote = await ghGet();
+    if(remote.data === null){
+      // Primo avvio: se c'erano impegni salvati solo in questo browser, li porto nel repository.
+      const legacy = legacyData();
+      if(legacy.impegni.length && canWrite){
+        await mutate(d=>{ d.impegni = legacy.impegni; d.colori = Object.assign({}, legacy.colori); });
+      } else {
+        applyData(normalize(null));
+        setSync('Calendario vuoto — sincronizzato alle '+hhmm());
+      }
+      return;
+    }
+    applyData(normalize(remote.data));
+    setSync('Sincronizzato alle '+hhmm());
+  }catch(e){
+    setSync('Non aggiornato: '+e.message);
+  }
+}
+
+function applyData(data){
+  items = data.impegni;
+  colori = Object.assign({}, data.colori);
+  saveJSON(CACHE_KEY, data);
+  refreshNames(); renderCal(); renderList();
+}
+
+/* ---------- Schermate ---------- */
+function showLogin(){
+  $('app').hidden = true; $('bar').hidden = true; $('login').hidden = false;
+  const p = new URLSearchParams(location.search).get('repo');
+  if(p && !$('lrepo').value) $('lrepo').value = p;
+}
+function showApp(){
+  $('login').hidden = true; $('app').hidden = false; $('bar').hidden = false;
+  updateWriteUI();
+}
+function updateWriteUI(){
+  document.body.classList.toggle('ro', !canWrite);
+  if(!canWrite) setSync('Modalità sola lettura');
+}
+
+$('loginForm').addEventListener('submit', async ev=>{
+  ev.preventDefault();
+  const repo = $('lrepo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,'').replace(/\/+$/,'');
+  const token = $('ltoken').value.trim();
+  const lm = $('lmsg'); lm.className='';
+  if(!/^[\w.-]+\/[\w.-]+$/.test(repo)){ lm.className='err'; lm.textContent='Scrivi il repository nel formato utente/nome.'; return; }
+  $('loginBtn').disabled = true; lm.textContent = 'Verifico…';
+  const prev = cfg;
+  cfg = {repo, token};
+  try{
+    const r = await fetch(`${API}/repos/${repo}`, {headers:hdr()});
+    if(!r.ok) throw new Error(errText(r.status));
+    canWrite = true;
+    saveJSON(CFG_KEY, cfg);
+    $('ltoken').value = ''; lm.textContent = '';
+    showApp(); await refresh();
+  }catch(e){
+    cfg = prev; lm.className='err'; lm.textContent = e.message;
+  }
+  $('loginBtn').disabled = false;
+});
+
+$('logoutBtn').onclick = ()=>{
+  if(!confirm('Uscire da questo dispositivo? Dovrai reinserire la chiave.')) return;
+  try{ localStorage.removeItem(CFG_KEY); localStorage.removeItem(CACHE_KEY); }catch(e){}
+  const repo = cfg ? cfg.repo : '';
+  cfg = null; items = []; colori = {}; canWrite = true; resetForm();
+  $('lrepo').value = repo; showLogin();
+};
+$('refreshBtn').onclick = refresh;
+$('shareBtn').onclick = async ()=>{
+  const url = location.origin + location.pathname + '?repo=' + encodeURIComponent(cfg.repo).replace('%2F','/');
+  try{ await navigator.clipboard.writeText(url); setSync('Link copiato. Ricorda: serve anche la chiave.'); }
+  catch(e){ prompt('Copia questo link:', url); }
+};
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refresh(); });
+setInterval(()=>{ if(!document.hidden) refresh(); }, 60000);
+
+/* ---------- Calendario ---------- */
+function refreshNames(){
+  const names = [...new Set(items.map(i=>i.nome))].sort((a,b)=>a.localeCompare(b));
+  $('nomi').innerHTML = names.map(n=>`<option value="${esc(n)}">`).join('');
+  const v = $('filtro').value;
+  $('filtro').innerHTML = '<option value="">Tutti</option>' + names.map(n=>`<option ${n===v?'selected':''} value="${esc(n)}">${esc(n)}</option>`).join('');
+}
+function visible(){
+  const f = $('filtro').value;
+  return items.filter(i=>!f || i.nome===f);
+}
+
+function renderCal(){
+  const y=cur.getFullYear(), m=cur.getMonth();
+  const label = `${MESI[m]} ${y}`;
+  $('monthLabel').textContent = label;
+  $('expTitle').textContent = 'Impegni — ' + label;
+  const first = new Date(y,m,1);
+  const offset = (first.getDay()+6)%7;
+  const start = new Date(y,m,1-offset);
+  const vis = visible();
+  const monthStart = iso(y,m,1), monthEnd = iso(y,m,new Date(y,m+1,0).getDate());
+
+  const usedNames = [...new Set(vis.filter(i=>i.al>=monthStart && i.dal<=monthEnd).map(i=>i.nome))].sort();
+  $('legend').innerHTML = usedNames.map(n=>{const c=col(n);return `<span style="background:${c.bg};border-color:${c.bd};color:${c.tx}">${esc(n)}</span>`}).join('');
+  $('mlegend').innerHTML = $('legend').innerHTML;
+
+  let html = DOW.map(d=>`<div class="dow">${d}</div>`).join('');
+  let mh = DOW.map(d=>`<div class="mdow">${d}</div>`).join('');
+  const todayIso = (()=>{const t=new Date();return iso(t.getFullYear(),t.getMonth(),t.getDate())})();
+  if(!selDay || selDay<monthStart || selDay>monthEnd) selDay = (todayIso>=monthStart && todayIso<=monthEnd) ? todayIso : monthStart;
+  const weeks = Math.ceil((offset + new Date(y,m+1,0).getDate())/7);
+  for(let i=0;i<weeks*7;i++){
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate()+i);
+    const s = iso(d.getFullYear(), d.getMonth(), d.getDate());
+    const out = d.getMonth()!==m;
+    const we = d.getDay()===0||d.getDay()===6;
+    const evs = vis.filter(e=>e.dal<=s && s<=e.al);
+    mh += `<button type="button" class="mcell${out?' out':''}${s===selDay?' sel':''}${s===todayIso?' today':''}" data-d="${s}"><span class="n">${d.getDate()}</span><span class="dots">${evs.slice(0,6).map(e=>`<i class="dot" style="background:${col(e.nome).bd}"></i>`).join('')}</span></button>`;
+    html += `<div class="day${out?' out':''}${we?' we':''}${s===todayIso?' today':''}"><div class="num">${d.getDate()}</div>` +
+      evs.map(e=>{const c=col(e.nome);return `<div class="chip" style="background:${c.bg};border-color:${c.bd};color:${c.tx}"><b>${esc(e.nome)}</b>: ${esc(e.impegno)}</div>`}).join('') + '</div>';
+  }
+  $('grid').innerHTML = html;
+  $('mgrid').innerHTML = mh;
+  renderDay();
+}
+
+function renderDay(){
+  const evs = visible().filter(e=>e.dal<=selDay && selDay<=e.al);
+  const [y,m,d] = selDay.split('-').map(Number);
+  const gs = ['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato'][new Date(y,m-1,d).getDay()];
+  $('mday').innerHTML = `<h3>${gs} ${d} ${MESI[m-1]}</h3>` + (evs.length
+    ? evs.map(e=>{const c=col(e.nome);return `<div class="mev" style="background:${c.bg};border-color:${c.bd};color:${c.tx}"><b>${esc(e.nome)}</b><br>${esc(e.impegno)}<br><small>${e.dal===e.al?fmt(e.dal):fmt(e.dal)+' → '+fmt(e.al)}</small></div>`}).join('')
+    : '<div class="empty">Nessun impegno in questo giorno.</div>');
+}
+$('mgrid').addEventListener('click', ev=>{
+  const b = ev.target.closest('.mcell'); if(!b) return;
+  selDay = b.dataset.d;
+  const [yy,mm] = selDay.split('-').map(Number);
+  cur = new Date(yy,mm-1,1);
+  renderCal();
+});
+
+const openGroups = new Set();   // gruppi aperti: restano aperti anche dopo un aggiornamento
+function renderList(){
+  if(!items.length){ $('list').innerHTML = '<div class="empty">Nessun impegno inserito.</div>'; return; }
+  const groups = {};
+  items.forEach(e=>{
+    const k = nk(e.nome);
+    if(!groups[k]) groups[k] = {k, nome:e.nome, list:[]};
+    groups[k].list.push(e);
+  });
+  const gs = Object.values(groups).sort((a,b)=>a.nome.localeCompare(b.nome));
+  $('list').innerHTML = gs.map(g=>{
+    const c = col(g.nome), n = g.list.length;
+    g.list.sort((a,b)=>a.dal.localeCompare(b.dal));
+    return `<details class="grp" data-k="${esc(g.k)}"${openGroups.has(g.k)?' open':''} style="border-left-color:${c.bd}">
+      <summary><span class="tag" style="background:${c.bg};color:${c.tx}">${esc(g.nome)}</span><span class="cnt">${n} ${n===1?'impegno':'impegni'}</span></summary>
+      <div class="gbody">` + g.list.map(e=>`<div class="sub">
+        <span class="per">${e.dal===e.al?fmt(e.dal):fmt(e.dal)+' → '+fmt(e.al)}</span>
+        <div>${esc(e.impegno)}</div>
+        <div class="row"><button data-edit="${e.id}">Modifica</button><button data-del="${e.id}">Elimina</button></div></div>`).join('') + `</div></details>`;
+  }).join('');
+}
+$('list').addEventListener('toggle', ev=>{
+  const d = ev.target; if(!d.classList || !d.classList.contains('grp')) return;
+  if(d.open) openGroups.add(d.dataset.k); else openGroups.delete(d.dataset.k);
+}, true);
+
+/* ---------- Form ---------- */
+function setMsg(t, err){ $('msg').textContent = t; $('msg').className = err ? 'err' : ''; }
+function resetForm(){
+  editId=null; $('f').reset(); $('formTitle').textContent='Nuovo impegno';
+  $('saveBtn').textContent='Aggiungi'; $('cancelBtn').hidden=true;
+}
+
+$('f').addEventListener('submit', async ev=>{
+  ev.preventDefault();
+  const nome=$('nome').value.trim(), dal=$('dal').value, al=$('al').value, impegno=$('impegno').value.trim();
+  if(!nome||!dal||!al||!impegno) return;
+  if(al<dal){ setMsg('La data "Al" deve essere uguale o successiva a "Dal".', true); return; }
+  const wasEdit = editId, id = editId || newId();
+  $('saveBtn').disabled = true; busy = true; setMsg('');
+  try{
+    await mutate(d=>{
+      const it = d.impegni.find(i=>i.id===id);
+      if(it) Object.assign(it,{nome,dal,al,impegno});
+      else d.impegni.push({id,nome,dal,al,impegno});
+    });
+    const [y,m]=dal.split('-').map(Number); cur=new Date(y,m-1,1);
+    resetForm(); renderCal();
+    setMsg(wasEdit ? 'Impegno aggiornato.' : 'Impegno aggiunto.');
+  }catch(e){
+    setMsg(e.message, true); setSync('Non salvato');
+  }
+  busy = false; $('saveBtn').disabled = false;
+});
+$('cancelBtn').onclick = ()=>{ resetForm(); setMsg(''); };
+
+$('list').addEventListener('click', async ev=>{
+  const ed = ev.target.dataset.edit, del = ev.target.dataset.del;
+  if(ed){
+    const e=items.find(i=>i.id===ed); if(!e) return;
+    editId=ed; $('nome').value=e.nome; $('dal').value=e.dal; $('al').value=e.al; $('impegno').value=e.impegno;
+    $('formTitle').textContent='Modifica impegno'; $('saveBtn').textContent='Salva modifiche'; $('cancelBtn').hidden=false;
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  if(del && confirm('Eliminare questo impegno?')){
+    busy = true;
+    try{
+      await mutate(d=>{ d.impegni = d.impegni.filter(i=>i.id!==del); });
+      if(editId===del) resetForm();
+    }catch(e){ alert(e.message); setSync('Non salvato'); }
+    busy = false;
+  }
+});
+
+$('dal').addEventListener('change', ()=>{ if(!$('al').value || $('al').value<$('dal').value) $('al').value=$('dal').value; });
+$('prev').onclick=()=>{cur=new Date(cur.getFullYear(),cur.getMonth()-1,1);renderCal();};
+$('next').onclick=()=>{cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);renderCal();};
+$('todayBtn').onclick=()=>{const t=new Date();cur=new Date(t.getFullYear(),t.getMonth(),1);renderCal();};
+$('filtro').onchange=renderCal;
+
+/* ---------- Export PDF / immagine ---------- */
+function snapshot(){
+  return html2canvas($('exportArea'),{scale:2,backgroundColor:'#ffffff',useCORS:true,windowWidth:1100});
+}
+const fname = () => `impegni-${cur.getFullYear()}-${pad(cur.getMonth()+1)}`;
+
+$('expImg').onclick = async ()=>{
+  try{
+    const c = await snapshot();
+    const a=document.createElement('a'); a.download=fname()+'.png'; a.href=c.toDataURL('image/png'); a.click();
+  }catch(e){ alert('Errore durante l\'esportazione dell\'immagine.'); }
+};
+$('expPdf').onclick = async ()=>{
+  try{
+    const c = await snapshot();
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    const pw=pdf.internal.pageSize.getWidth()-16, ph=pdf.internal.pageSize.getHeight()-16;
+    let w=pw, h=c.height*w/c.width;
+    if(h>ph){ h=ph; w=c.width*h/c.height; }
+    pdf.addImage(c.toDataURL('image/png'),'PNG',(pdf.internal.pageSize.getWidth()-w)/2,8,w,h);
+    pdf.save(fname()+'.pdf');
+  }catch(e){ alert('Errore durante l\'esportazione del PDF.'); }
+};
+
+/* ---------- Backup ---------- */
+$('bkExp').onclick=()=>{
+  const blob=new Blob([JSON.stringify({versione:2,impegni:items,colori},null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='calendario-impegni-backup.json'; a.click();
+};
+$('bkImp').onclick=()=>$('bkFile').click();
+$('bkFile').onchange=async ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  try{
+    const raw=JSON.parse(await f.text());
+    const imp = normalize(Array.isArray(raw) ? {impegni:raw} : raw);
+    if(!confirm('Sostituire tutti gli impegni attuali con quelli del backup ('+imp.impegni.length+')?')) { ev.target.value=''; return; }
+    imp.impegni = imp.impegni.map(d=>({id:d.id||newId(),nome:d.nome,dal:d.dal,al:d.al,impegno:d.impegno}));
+    busy = true;
+    await mutate(d=>{ d.impegni = imp.impegni; d.colori = Object.assign({}, imp.colori, d.colori); });
+  }catch(e){ alert(e.message && e.message.length<120 ? e.message : 'File di backup non valido.'); }
+  busy = false; ev.target.value='';
+};
+
+/* ---------- Avvio ---------- */
+if(cfg){
+  showApp();
+  const cached = loadJSON(CACHE_KEY, null);
+  if(cached) applyData(normalize(cached)); else renderCal();
+  refresh();
+} else {
+  showLogin();
+  renderCal();
+}
+</script>
+</body>
+</html>
